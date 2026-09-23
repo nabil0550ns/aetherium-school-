@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-dark: #0B0F1A;
+    --bg-light: #F7F5F1;
+    --gold: #C9A876;
+    --gold-light: #E0C79D;
+    --gold-dim: rgba(201, 168, 118, 0.15);
+    --cognition: #4DE1FF;
+    --cognition-dim: rgba(77, 225, 255, 0.15);
+    --navy-surface: #101626;
+    --navy-card: #141B2D;
+    --navy-border: rgba(201, 168, 118, 0.2);
+  }
+
+  html {
+    background-color: #0B0F1A;
+    color: #F7F5F1;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background-color: #0B0F1A;
+    color: #F7F5F1;
+  }
+
+  /* Fluid typography */
+  .fluid-display {
+    font-size: clamp(2.5rem, 5vw + 1rem, 5.5rem);
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+  }
+
+  .fluid-h2 {
+    font-size: clamp(1.8rem, 3.5vw + 0.5rem, 3.75rem);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+
+  .fluid-h3 {
+    font-size: clamp(1.4rem, 2vw + 0.3rem, 2.25rem);
+    line-height: 1.25;
+  }
+
+  .fluid-body {
+    font-size: clamp(1rem, 0.5vw + 0.85rem, 1.2rem);
+    line-height: 1.65;
+  }
+}
+
+/* Custom font utilities */
+.font-editorial {
+  font-family: 'Fraunces', Georgia, serif;
+  font-optical-sizing: auto;
+}
+
+.font-sans-ui {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+.font-mono-tech {
+  font-family: 'Space Grotesk', monospace;
+}
+
+/* Glassmorphism effects */
+.glass-panel {
+  background: rgba(16, 22, 38, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(201, 168, 118, 0.18);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+}
+
+.glass-card-light {
+  background: rgba(247, 245, 241, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(201, 168, 118, 0.35);
+  box-shadow: 0 15px 35px rgba(11, 15, 26, 0.08);
+}
+
+.glass-gold-subtle {
+  background: linear-gradient(135deg, rgba(201, 168, 118, 0.08) 0%, rgba(11, 15, 26, 0.4) 100%);
+  border: 1px solid rgba(201, 168, 118, 0.25);
+}
+
+/* Interactive Cognition Blue glow - strictly active/hover only */
+.cognition-interactive {
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.cognition-interactive:hover,
+.cognition-interactive:focus-visible {
+  color: #4DE1FF !important;
+  text-shadow: 0 0 12px rgba(77, 225, 255, 0.6);
+  border-color: rgba(77, 225, 255, 0.5) !important;
+  box-shadow: 0 0 25px rgba(77, 225, 255, 0.25);
+}
+
+/* Grain overlay */
+.bg-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+/* God Rays gradient */
+.god-rays {
+  background: radial-gradient(circle at 50% 0%, rgba(201, 168, 118, 0.15) 0%, rgba(77, 225, 255, 0.03) 40%, transparent 70%);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #0B0F1A;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(201, 168, 118, 0.3);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(77, 225, 255, 0.5);
+}
+
+/* Reduced Motion Safety Fallback */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
