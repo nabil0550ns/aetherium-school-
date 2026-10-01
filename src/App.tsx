@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { initSmoothScroll } from './utils/scrollEngine';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { MagneticCursor } from './components/MagneticCursor';
 import { EtherealDecoration } from './components/EtherealDecoration';
 import { Navigation } from './components/Navigation';
@@ -8,16 +9,23 @@ import { Philosophy } from './components/Philosophy';
 import { PillarsDiorama } from './components/PillarsDiorama';
 import { LifeAtAetherium } from './components/LifeAtAetherium';
 import { InnovationSuite } from './components/InnovationSuite';
+import { NewsSection } from './components/NewsSection';
+import { GallerySection } from './components/GallerySection';
 import { AdmissionsFunnel } from './components/AdmissionsFunnel';
 import { VoicePortraits } from './components/VoicePortraits';
+import { FaqSection } from './components/FaqSection';
+import { ContactSection } from './components/ContactSection';
 import { ConstellationFooter } from './components/ConstellationFooter';
 import { LiquidGlassDivider } from './components/LiquidGlassDivider';
 import { PrivateTourModal } from './components/PrivateTourModal';
 import { SanctumPortal } from './components/SanctumPortal';
+import { StudentPortal } from './components/student/StudentPortal';
 
-export function App() {
+function MainAppContent() {
+  const { isRtl } = useLanguage();
   const [tourModalOpen, setTourModalOpen] = useState<boolean>(false);
   const [sanctumOpen, setSanctumOpen] = useState<boolean>(false);
+  const [studentPortalOpen, setStudentPortalOpen] = useState<boolean>(false);
   const [sanctumInitialTab, setSanctumInitialTab] = useState<'overview' | 'neuropulse' | 'aegis' | 'nutrition' | 'whisper'>('overview');
 
   useEffect(() => {
@@ -42,11 +50,11 @@ export function App() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#0B0F1A] text-[#F7F5F1] selection:bg-[#C9A876]/30 selection:text-[#4DE1FF]">
+    <div className={`relative min-h-screen bg-[#0B0F1A] text-[#F8F6F2] selection:bg-[#C9A24B]/30 selection:text-[#2FD6C8] ${isRtl ? 'font-arabic' : 'font-sans-ui'}`}>
       {/* Magnetic Cursor Follower */}
       <MagneticCursor />
 
-      {/* 4-Plane Ethereal Parallax Glyph Decoration */}
+      {/* 4-Plane Ethereal Parallax Glyph & Andalusian Star Decoration */}
       <EtherealDecoration />
 
       {/* Fixed Luxury Navigation Header */}
@@ -56,10 +64,11 @@ export function App() {
           setSanctumInitialTab('overview');
           setSanctumOpen(true);
         }}
+        onOpenStudentPortal={() => setStudentPortalOpen(true)}
         onNavigate={handleScrollToSection}
       />
 
-      {/* 1. The Threshold (WebGL Hero with Particle Monogram & Morph) */}
+      {/* 1. The Threshold (WebGL Hero with Particle Monogram & Arabic Typography) */}
       <div id="hero">
         <KineticHero
           onExplorePillars={() => handleScrollToSection('pillars')}
@@ -73,7 +82,7 @@ export function App() {
 
       <LiquidGlassDivider />
 
-      {/* 2. Philosophy / Why Aetherium (Sanctuary Ethos & 3–14 Perimeter) */}
+      {/* 2. Philosophy / Why El Andalus (Sanctuary Ethos & 3–14 Perimeter without High School) */}
       <Philosophy />
 
       <LiquidGlassDivider inverted />
@@ -83,32 +92,51 @@ export function App() {
 
       <LiquidGlassDivider />
 
-      {/* 4. Life at Aetherium (Campus Architecture, Hospital Air Purity, Safety Mesh) */}
+      {/* 4. Life at El Andalus (Biophilic Architecture, HEPA Air Hygiene, Bio-Safety, Chef Abdelkader) */}
       <LifeAtAetherium />
 
       <LiquidGlassDivider inverted />
 
-      {/* 5. The Exclusive Innovation Suite (4 World-First Breakthroughs) */}
+      {/* 5. The Exclusive Innovation Suite (NeuroPulse, Aegis Mesh, Harvest Ledger, Whisper Channel) */}
       <InnovationSuite onOpenSanctumWithTab={handleOpenSanctumWithTab} />
 
       <LiquidGlassDivider />
 
-      {/* 6. Admissions Funnel (Scarcity Odometer & Morphing ROI Trajectory Slider) */}
+      {/* 6. Campus Chronicles & News */}
+      <NewsSection />
+
+      <LiquidGlassDivider inverted />
+
+      {/* 7. Gallery of Spaces & Ateliers */}
+      <GallerySection />
+
+      <LiquidGlassDivider />
+
+      {/* 8. Admissions Funnel (Seat Availability, Trajectory Slider & Multi-step RTL Form) */}
       <AdmissionsFunnel onOpenTourModal={() => setTourModalOpen(true)} />
 
       <LiquidGlassDivider inverted />
 
-      {/* 7. Voice Portraits (Cinematic Ken Burns Testimonials) */}
+      {/* 9. Voice Portraits (Parent Testimonials) */}
       <VoicePortraits />
 
       <LiquidGlassDivider />
 
-      {/* 8. Constellation Map & Community Footer */}
+      {/* 10. Frequently Asked Questions (FAQ Accordion) */}
+      <FaqSection />
+
+      <LiquidGlassDivider inverted />
+
+      {/* 11. Campus Directorate & Contact (Hydra / El Biar, Algiers) */}
+      <ContactSection />
+
+      {/* 12. Constellation Topography Map & Community Footer */}
       <ConstellationFooter
         onOpenSanctum={() => {
           setSanctumInitialTab('overview');
           setSanctumOpen(true);
         }}
+        onOpenStudentPortal={() => setStudentPortalOpen(true)}
         onOpenTour={() => setTourModalOpen(true)}
       />
 
@@ -123,7 +151,20 @@ export function App() {
         onClose={() => setSanctumOpen(false)}
         initialTab={sanctumInitialTab}
       />
+
+      <StudentPortal
+        isOpen={studentPortalOpen}
+        onClose={() => setStudentPortalOpen(false)}
+      />
     </div>
+  );
+}
+
+export function App() {
+  return (
+    <LanguageProvider>
+      <MainAppContent />
+    </LanguageProvider>
   );
 }
 
