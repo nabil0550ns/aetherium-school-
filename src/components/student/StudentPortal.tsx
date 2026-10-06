@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Sparkles,
@@ -8,9 +8,36 @@ import {
   GraduationCap,
   Flame,
   Zap,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import { mockStudents, mockTimetable, mockHomework, mockBadges } from '../../data/mockData';
 import { useLanguage } from '../../context/LanguageContext';
+import api from '../../services/api';
+
+interface XPLogItem {
+  id: string;
+  studentId: string;
+  amount: number;
+  reason: string;
+  awardedAt: string;
+}
+
+interface StudentProfileResponse {
+  id?: string;
+  userId?: string;
+  totalXP: number;
+  xpLogs?: XPLogItem[];
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+    school?: {
+      id: string;
+      name: string;
+    };
+  };
+}
 
 interface StudentPortalProps {
   isOpen: boolean;
@@ -23,9 +50,38 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
   const [activeTab, setActiveTab] = useState<'hub' | 'timetable' | 'quests' | 'badges'>('hub');
   const [rfidScanned, setRfidScanned] = useState(false);
 
+  // Live student dashboard state from backend API (GET /student/dashboard)
+  const [profileData, setProfileData] = useState<StudentProfileResponse | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchStudentDashboard = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.get<StudentProfileResponse>('/student/dashboard');
+      setProfileData(response.data);
+    } catch (err: any) {
+      console.warn('Failed to fetch /student/dashboard from API:', err?.response?.data || err.message);
+      setError(err?.response?.data?.error || err.message || 'Unable to connect to live API');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchStudentDashboard();
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const currentStudent = mockStudents[selectedStudentIndex];
+
+  // Derive dynamic totalXP and Level from API or mock fallback
+  const totalXP = profileData?.totalXP !== undefined ? profileData.totalXP : 1850;
+  const scholarLevel = Math.max(1, Math.floor(totalXP / 300) + 1);
 
   const handleSimulateScan = () => {
     setRfidScanned(true);
@@ -43,8 +99,17 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
                 <GraduationCap className="w-5 h-5" />
               </div>
               <div>
-                <div className="font-editorial text-base text-white font-medium">
-                  {isRtl ? 'فضاء التلميذ · مدرسة الأندلس' : 'Student Hub · El Andalus'}
+                <div className="font-editorial text-base text-white font-medium flex items-center gap-2">
+                  <span>{isRtl ? 'فضاء التلميذ · مدرسة الأندلس' : 'Student Hub · El Andalus'}</span>
+                  {profileData ? (
+                    <span className="text-[9px] font-mono-tech px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      API Online
+                    </span>
+                  ) : error ? (
+                    <span className="text-[9px] font-mono-tech px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                      Mock Mode
+                    </span>
+                  ) : null}
                 </div>
                 <div className="text-[10px] font-mono-tech text-[#2FD6C8]">
                   {isRtl ? 'البوابة الذكية للمهام والإنجازات' : 'Academic Quests & Achievements'}
@@ -74,6 +139,15 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={fetchStudentDashboard}
+              disabled={loading}
+              title={isRtl ? 'تحديث البيانات من الخادم' : 'Refresh from API'}
+              className="p-2 rounded-xl bg-white/5 hover:bg-[#2FD6C8]/20 text-[#2FD6C8] border border-white/10 transition-colors"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+
             <button
               onClick={handleSimulateScan}
               className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono-tech transition-all ${
@@ -133,14 +207,21 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs font-mono-tech px-2.5 py-0.5 rounded bg-[#2FD6C8]/10 text-[#2FD6C8] border border-[#2FD6C8]/30">
-                        {currentStudent.grade}
+                        {profileData?.user?.role || currentStudent.grade}
                       </span>
                       <span className="text-xs font-mono-tech text-[#C9A24B]">
-                        {currentStudent.id}
+                        {profileData?.id || currentStudent.id}
                       </span>
+                      {profileData && (
+                        <span className="text-[10px] font-mono-tech px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          {profileData.user?.school?.name || 'مدرسة الأندلس'}
+                        </span>
+                      )}
                     </div>
                     <h2 className="font-editorial text-2xl sm:text-3xl text-white font-medium">
-                      {isRtl ? `مرحباً بك يا ${currentStudent.name}` : `Welcome back, ${currentStudent.name}`}
+                      {profileData?.user?.email
+                        ? (isRtl ? `مرحباً بك يا ${profileData.user.email.split('@')[0]}` : `Welcome back, ${profileData.user.email.split('@')[0]}`)
+                        : (isRtl ? `مرحباً بك يا ${currentStudent.name}` : `Welcome back, ${currentStudent.name}`)}
                     </h2>
                     <p className="font-sans-ui text-xs text-[#F8F6F2]/70 mt-1">
                       {isRtl ? 'الموقع الحالي: ' : 'Supervised in: '}
@@ -152,20 +233,39 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
                   </div>
                 </div>
 
-                {/* Level / XP Pill */}
+                {/* Level / XP Pill (Live from GET /student/dashboard) */}
                 <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl shrink-0">
                   <div className="w-12 h-12 rounded-xl bg-[#2FD6C8]/10 border border-[#2FD6C8]/40 flex items-center justify-center text-[#2FD6C8]">
-                    <Flame className="w-6 h-6 animate-pulse" />
+                    {loading ? (
+                      <Loader2 className="w-6 h-6 animate-spin text-[#2FD6C8]" />
+                    ) : (
+                      <Flame className="w-6 h-6 animate-pulse" />
+                    )}
                   </div>
                   <div>
-                    <div className="text-[11px] font-mono-tech text-[#F8F6F2]/50">
-                      {isRtl ? 'النقاط الأكاديمية (XP)' : 'Total XP'}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-mono-tech text-[#F8F6F2]/50">
+                        {isRtl ? 'النقاط الأكاديمية (XP)' : 'Total XP'}
+                      </span>
+                      {profileData && (
+                        <span className="text-[9px] font-mono-tech px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          LIVE DB
+                        </span>
+                      )}
                     </div>
                     <div className="text-xl font-editorial font-bold text-white">
-                      1,850 XP
+                      {loading ? (
+                        <span className="text-sm font-mono-tech text-[#2FD6C8] animate-pulse">
+                          {isRtl ? 'جاري المزامنة...' : 'Syncing...'}
+                        </span>
+                      ) : (
+                        `${totalXP.toLocaleString()} XP`
+                      )}
                     </div>
                     <div className="text-[10px] text-[#2FD6C8] font-mono-tech">
-                      {isRtl ? 'المستوى 06 · مفكر متقدم' : 'Level 06 · Advanced Scholar'}
+                      {isRtl
+                        ? `المستوى ${String(scholarLevel).padStart(2, '0')} · مفكر متقدم`
+                        : `Level ${String(scholarLevel).padStart(2, '0')} · Advanced Scholar`}
                     </div>
                   </div>
                 </div>
@@ -208,13 +308,15 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
                   </div>
                 </div>
 
-                {/* 2. Homework Quests Progress */}
+                {/* 2. Homework Quests / Real XP Logs */}
                 <div className="p-6 rounded-3xl glass-panel border border-white/10 bg-[#0E1526]/80 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <span className="text-xs font-mono-tech text-[#C9A24B] flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5" />
-                        {isRtl ? 'المشاريع والواجبات النشطة' : 'Active Quests'}
+                        {profileData?.xpLogs && profileData.xpLogs.length > 0
+                          ? (isRtl ? 'سجل النقاط المكتسبة (Live)' : 'Live XP Logs')
+                          : (isRtl ? 'المشاريع والواجبات النشطة' : 'Active Quests')}
                       </span>
                       <button
                         onClick={() => setActiveTab('quests')}
@@ -225,25 +327,46 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
                     </div>
 
                     <div className="space-y-3">
-                      {mockHomework.map((hw) => (
-                        <div key={hw.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col justify-between">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-editorial text-white">{hw.title}</span>
-                            <span className="text-[11px] font-mono-tech text-[#2FD6C8]">+{hw.xpReward} XP</span>
+                      {/* Render live XP logs if returned by API */}
+                      {profileData?.xpLogs && profileData.xpLogs.length > 0 ? (
+                        profileData.xpLogs.slice(0, 3).map((log) => (
+                          <div key={log.id} className="p-3 rounded-xl bg-white/5 border border-[#2FD6C8]/20 flex flex-col justify-between">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-editorial text-white line-clamp-1">{log.reason}</span>
+                              <span className="text-[11px] font-mono-tech text-[#2FD6C8] font-bold">+{log.amount} XP</span>
+                            </div>
+                            <div className="flex items-center justify-between text-[11px] font-mono-tech text-[#F8F6F2]/60">
+                              <span className="text-emerald-400">{isRtl ? 'سجل معتمد' : 'Verified'}</span>
+                              <span className="text-[#C9A24B]">
+                                {new Date(log.awardedAt).toLocaleDateString(isRtl ? 'ar-DZ' : 'en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                })}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex items-center justify-between text-[11px] font-mono-tech text-[#F8F6F2]/60">
-                            <span>{hw.subject}</span>
-                            <span className={hw.status === 'completed' ? 'text-[#2FD6C8]' : 'text-[#C9A24B]'}>
-                              {hw.dueDate}
-                            </span>
+                        ))
+                      ) : (
+                        mockHomework.map((hw) => (
+                          <div key={hw.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col justify-between">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-editorial text-white">{hw.title}</span>
+                              <span className="text-[11px] font-mono-tech text-[#2FD6C8]">+{hw.xpReward} XP</span>
+                            </div>
+                            <div className="flex items-center justify-between text-[11px] font-mono-tech text-[#F8F6F2]/60">
+                              <span>{hw.subject}</span>
+                              <span className={hw.status === 'completed' ? 'text-[#2FD6C8]' : 'text-[#C9A24B]'}>
+                                {hw.dueDate}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   </div>
 
                   <div className="pt-4 border-t border-white/10 text-xs text-[#2FD6C8] font-mono-tech">
-                    {isRtl ? '✓ تسليم الواجبات يتم بنقرة واحدة' : '1-click submission ready'}
+                    {profileData ? (isRtl ? '✓ متصل بقاعدة بيانات المدرسة' : '✓ Connected to live database') : (isRtl ? '✓ تسليم الواجبات يتم بنقرة واحدة' : '1-click submission ready')}
                   </div>
                 </div>
 
@@ -337,17 +460,65 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
             </div>
           )}
 
-          {/* TAB 3: Homework Quests */}
+          {/* TAB 3: Homework Quests & Live XP Logs */}
           {activeTab === 'quests' && (
             <div className="space-y-6 animate-in fade-in duration-300">
-              <div>
-                <h3 className="font-editorial text-2xl text-white">
-                  {isRtl ? 'مغامرات الواجبات والمشاريع المفتوحة' : 'Homework & Research Quests'}
-                </h3>
-                <p className="font-sans-ui text-xs text-[#F8F6F2]/70">
-                  {isRtl ? 'أكمل المهام الموكلة إليك واكسب نقاط الخبرة والشارات' : 'Complete quests to earn XP and level up your scholar ranking.'}
-                </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-editorial text-2xl text-white">
+                    {profileData?.xpLogs && profileData.xpLogs.length > 0
+                      ? (isRtl ? 'سجل نقاط الخبرة والمهام المكتملة' : 'Verified XP Ledger & Completed Quests')
+                      : (isRtl ? 'مغامرات الواجبات والمشاريع المفتوحة' : 'Homework & Research Quests')}
+                  </h3>
+                  <p className="font-sans-ui text-xs text-[#F8F6F2]/70">
+                    {isRtl ? 'أكمل المهام الموكلة إليك واكسب نقاط الخبرة والشارات' : 'Complete quests to earn XP and level up your scholar ranking.'}
+                  </p>
+                </div>
+                {profileData?.xpLogs && profileData.xpLogs.length > 0 && (
+                  <div className="text-xs font-mono-tech text-[#2FD6C8] px-3 py-1 rounded-xl bg-white/5 border border-white/10">
+                    {profileData.xpLogs.length} {isRtl ? 'سجلات معتمدة' : 'XP Logs'}
+                  </div>
+                )}
               </div>
+
+              {/* If live XP logs exist from API, display them */}
+              {profileData?.xpLogs && profileData.xpLogs.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                  {profileData.xpLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="p-6 rounded-3xl glass-panel border border-[#2FD6C8]/30 bg-[#0E1526]/90 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs font-mono-tech px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                            {isRtl ? 'منحة أستاذ' : 'Teacher Award'}
+                          </span>
+                          <span className="text-xs font-mono-tech text-[#C9A24B] font-bold">
+                            +{log.amount} XP
+                          </span>
+                        </div>
+
+                        <h4 className="font-editorial text-lg text-white mb-2">
+                          {log.reason}
+                        </h4>
+
+                        <p className="text-xs font-mono-tech text-[#F8F6F2]/60 mb-6">
+                          {isRtl ? 'تاريخ المنح:' : 'Awarded on:'}{' '}
+                          <span className="text-white">
+                            {new Date(log.awardedAt).toLocaleString(isRtl ? 'ar-DZ' : 'en-US')}
+                          </span>
+                        </p>
+                      </div>
+
+                      <div className="w-full py-2.5 rounded-xl text-xs font-mono-tech tracking-wider uppercase bg-[#2FD6C8]/10 text-[#2FD6C8] border border-[#2FD6C8]/30 flex items-center justify-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-[#2FD6C8]" />
+                        <span>{isRtl ? 'معتمد في قاعدة البيانات' : 'Verified in DB'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {mockHomework.map((hw) => (
@@ -451,3 +622,5 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
     </div>
   );
 };
+
+export default StudentPortal;
