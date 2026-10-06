@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import authRouter from './routes/auth.js';
 import studentRouter from './routes/student.js';
+import teacherRouter from './routes/teacher.js';
 
 dotenv.config();
 
@@ -18,6 +19,7 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRouter);
 app.use('/api/student', studentRouter);
+app.use('/api/teacher', teacherRouter);
 
 // GET /api/health - Returns database connection status
 app.get('/api/health', async (req, res) => {
