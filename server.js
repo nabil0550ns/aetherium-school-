@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import authRouter from './routes/auth.js';
+import studentRouter from './routes/student.js';
 
 dotenv.config();
 
@@ -16,6 +17,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/auth', authRouter);
+app.use('/api/student', studentRouter);
 
 // GET /api/health - Returns database connection status
 app.get('/api/health', async (req, res) => {
