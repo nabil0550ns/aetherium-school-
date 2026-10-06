@@ -14,136 +14,36 @@ enum Role {
   PARENT
 }
 
-enum Pillar {
-  PREPARATORY // الطور التحضيري (3–5 سنوات)
-  PRIMARY     // الطور الابتدائي (6–10 سنوات)
-  MIDDLE      // الطور المتوسط (11–14 سنة)
-}
-
-enum QuestStatus {
-  PENDING
-  IN_PROGRESS
-  COMPLETED
-}
-
 model School {
-  id          String   @id @default(uuid())
-  name        String   @default("مدرسة الأندلس")
-  code        String   @unique @default("ANDALUS-DZ")
-  address     String?  @default("حي حيدرة / الأبيار، الجزائر العاصمة")
-  phone       String?  @default("+213 (0) 23 88 44 20")
-  email       String?  @default("contact@elandalus-academy.dz")
-  users       User[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(uuid())
+  name      String
+  users     User[]
+  createdAt DateTime @default(now())
 }
 
 model User {
   id           String          @id @default(uuid())
-  fullName     String
   email        String          @unique
-  phone        String?
   passwordHash String
   role         Role
   schoolId     String
-  school       School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  
-  // Specific profile links
+  school       School          @relation(fields: [schoolId], references: [id])
   studentData  StudentProfile?
-  parentData   ParentProfile?
-
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-
-  @@index([schoolId])
-  @@index([role])
-}
-
-model ParentProfile {
-  id          String           @id @default(uuid())
-  userId      String           @unique
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  relation    String?          @default("أب") // أب، أم، وصي شرعي
-  children    ParentStudent[]
-  
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
 }
 
 model StudentProfile {
-  id              String           @id @default(uuid())
-  userId          String           @unique
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  studentCode     String           @unique // e.g. AND-ST-01
-  pillar          Pillar           @default(PRIMARY)
-  gradeLevel      String           // e.g. "السنة الثالثة ابتدائي"
-  rfidCardUid     String?          @unique
-  supervisedZone  String?          @default("البهو البيولوجي")
-  
-  totalXP         Int              @default(0)
-  xpLogs          XPLog[]
-  
-  parents         ParentStudent[]
-  quests          HomeworkQuest[]
-  badges          EarnedBadge[]
-
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-
-  @@index([pillar])
-}
-
-// Many-to-Many link between Parents and Students
-model ParentStudent {
-  id          String         @id @default(uuid())
-  parentId    String
-  parent      ParentProfile  @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  studentId   String
-  student     StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-
-  assignedAt  DateTime       @default(now())
-
-  @@unique([parentId, studentId])
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  totalXP   Int      @default(0)
+  xpLogs    XPLog[]
 }
 
 model XPLog {
   id          String         @id @default(uuid())
   studentId   String
-  student     StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student     StudentProfile @relation(fields: [studentId], references: [id])
   amount      Int
-  reason      String         // e.g. "إنجاز نموذج خلية نباتية متوازنة"
-  awardedBy   String?        // Teacher or system
+  reason      String
   awardedAt   DateTime       @default(now())
-
-  @@index([studentId])
-}
-
-model HomeworkQuest {
-  id          String         @id @default(uuid())
-  studentId   String
-  student     StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  title       String
-  subject     String
-  dueDate     DateTime
-  status      QuestStatus    @default(PENDING)
-  xpReward    Int            @default(150)
-  
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-
-  @@index([studentId])
-}
-
-model EarnedBadge {
-  id          String         @id @default(uuid())
-  studentId   String
-  student     StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  badgeName   String         // e.g. "وسام الفصاحة والبيان"
-  description String
-  iconName    String         @default("Award")
-  color       String         @default("#C9A24B")
-  awardedAt   DateTime       @default(now())
-
-  @@index([studentId])
 }
