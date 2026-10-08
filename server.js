@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 import authRouter from './routes/auth.js';
 import studentRouter from './routes/student.js';
@@ -9,8 +11,46 @@ import teacherRouter from './routes/teacher.js';
 dotenv.config();
 
 const app = express();
+const httpServer = createServer(app);
 const prisma = new PrismaClient();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT && process.env.PORT !== '5173' ? process.env.PORT : (process.env.BACKEND_PORT || 3000);
+
+// Initialize Socket.io with CORS
+const io = new Server(httpServer, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
+});
+
+// Make 'io' instance globally accessible
+app.set('io', io);
+global.io = io;
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  console.log(`⚡ Socket client connected: ${socket.id}`);
+
+  // Join student personal room
+  socket.on('join_student', (studentId) => {
+    if (studentId) {
+      socket.join(String(studentId));
+      socket.join(`student_${studentId}`);
+      console.log(`👤 Socket ${socket.id} joined student room: ${studentId}`);
+    }
+  });
+
+  socket.on('join_room', (room) => {
+    if (room) {
+      socket.join(String(room));
+      console.log(`🚪 Socket ${socket.id} joined room: ${room}`);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`🔌 Socket client disconnected: ${socket.id}`);
+  });
+});
 
 // Middleware
 app.use(cors());
@@ -31,6 +71,7 @@ app.get('/api/health', async (req, res) => {
       status: 'ok',
       message: 'Server and database are healthy',
       database: 'connected',
+      socketio: 'ready',
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -50,6 +91,7 @@ app.get('/', (req, res) => {
   res.json({
     name: 'El Andalus Academy API',
     status: 'running',
+    socketio: 'enabled',
     healthCheck: '/api/health',
   });
 });
@@ -65,8 +107,9 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-// Start Server
-app.listen(PORT, () => {
+// Start Server with Socket.io attached
+httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🩺 Health check available at http://localhost:${PORT}/api/health`);
+  console.log(`⚡ Socket.io real-time engine initialized`);
 });

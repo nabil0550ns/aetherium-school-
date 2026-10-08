@@ -75,6 +75,27 @@ router.post('/award-xp', requireAuth, async (req, res) => {
       }),
     ]);
 
+    // 5. Emit 'new_xp' socket event to the student's room
+    const io = req.app.get('io') || global.io;
+    if (io) {
+      const socketPayload = {
+        amount: parsedAmount,
+        reason: String(reason).trim(),
+        totalXP: updatedProfile.totalXP,
+        xpLog: newXPLog,
+        studentId: profile.id,
+        userId: profile.userId,
+        awardedAt: newXPLog.awardedAt,
+      };
+
+      // Emit to the student's room
+      io.to(profile.id)
+        .to(profile.userId)
+        .to(`student_${profile.id}`)
+        .to(`student_${profile.userId}`)
+        .emit('new_xp', socketPayload);
+    }
+
     return res.status(200).json({
       message: 'XP awarded successfully',
       xpLog: newXPLog,

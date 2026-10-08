@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   RotateCcw,
 } from 'lucide-react';
+import { io, type Socket } from 'socket.io-client';
+import confetti from 'canvas-confetti';
 import { mockStudents, mockTimetable, mockHomework, mockBadges } from '../../data/mockData';
 import { useLanguage } from '../../context/LanguageContext';
 import api from '../../services/api';
@@ -57,12 +59,24 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Real-time Socket.io state for dynamic XP and logs
+  const [realtimeXP, setRealtimeXP] = useState<number | null>(null);
+  const [realtimeLogs, setRealtimeLogs] = useState<XPLogItem[]>([]);
+  const [socketConnected, setSocketConnected] = useState<boolean>(false);
+  const [recentXpAlert, setRecentXpAlert] = useState<{ amount: number; reason: string } | null>(null);
+
   const fetchStudentDashboard = async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await api.get<StudentProfileResponse>('/student/dashboard');
       setProfileData(response.data);
+      if (response.data.totalXP !== undefined) {
+        setRealtimeXP(response.data.totalXP);
+      }
+      if (response.data.xpLogs) {
+        setRealtimeLogs(response.data.xpLogs);
+      }
     } catch (err: any) {
       console.warn('Failed to fetch /student/dashboard from API:', err?.response?.data || err.message);
       setError(
@@ -82,13 +96,116 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   const currentStudent = mockStudents[selectedStudentIndex];
 
-  // Derive dynamic totalXP and Level from API or mock fallback
-  const totalXP = profileData?.totalXP !== undefined ? profileData.totalXP : 1850;
-  const scholarLevel = Math.max(1, Math.floor(totalXP / 300) + 1);
+  // Socket.io integration: establish connection on component mount, join student room, listen for 'new_xp'
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Resolve socket URL from environment or api baseURL origin
+    const socketUrl =
+      import.meta.env.VITE_SOCKET_URL ||
+      (api.defaults.baseURL ? api.defaults.baseURL.replace(/\/api\/?$/, '') : 'http://localhost:3000');
+
+    const socket: Socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+    });
+
+    const joinStudentRoom = () => {
+      const primaryId = profileData?.id || profileData?.userId || currentStudent.id;
+      if (primaryId) {
+        socket.emit('join_student', primaryId);
+        socket.emit('join_room', primaryId);
+        console.log(`👤 Joined student room: ${primaryId}`);
+      }
+      if (profileData?.userId && profileData.userId !== profileData.id) {
+        socket.emit('join_student', profileData.userId);
+      }
+    };
+
+    socket.on('connect', () => {
+      console.log(`⚡ Socket.io real-time connected to ${socketUrl} (ID: ${socket.id})`);
+      setSocketConnected(true);
+      joinStudentRoom();
+    });
+
+    socket.on('disconnect', () => {
+      console.log('🔌 Socket.io disconnected');
+      setSocketConnected(false);
+    });
+
+    // In case profileData resolved after connect
+    if (socket.connected) {
+      joinStudentRoom();
+    }
+
+    // Listen for 'new_xp' event
+    socket.on('new_xp', (data: { amount: number; reason: string; totalXP?: number; xpLog?: XPLogItem }) => {
+      console.log('🎉 Socket.io event [new_xp] received:', data);
+
+      // 1. Dynamically update totalXP state
+      setRealtimeXP((prev) => {
+        if (data.totalXP !== undefined) return data.totalXP;
+        return (prev !== null ? prev : 1850) + (data.amount || 0);
+      });
+
+      // 2. Dynamically append new log to the UI without reloading
+      const newLogItem: XPLogItem = data.xpLog || {
+        id: `xp-realtime-${Date.now()}`,
+        studentId: profileData?.id || currentStudent.id,
+        amount: data.amount,
+        reason: data.reason,
+        awardedAt: new Date().toISOString(),
+      };
+
+      setRealtimeLogs((prevLogs) => [newLogItem, ...prevLogs]);
+
+      // 3. Trigger celebratory real-time alert and confetti
+      setRecentXpAlert({
+        amount: data.amount,
+        reason: data.reason,
+      });
+
+      try {
+        confetti({
+          particleCount: 55,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#2FD6C8', '#C9A24B', '#FFFFFF'],
+        });
+      } catch {
+        // Safe fallback if DOM not ready
+      }
+
+      setTimeout(() => {
+        setRecentXpAlert(null);
+      }, 5000);
+    });
+
+    return () => {
+      console.log('🔌 Cleaning up Socket.io connection on unmount');
+      socket.disconnect();
+    };
+  }, [isOpen, profileData?.id, profileData?.userId, currentStudent.id]);
+
+  if (!isOpen) return null;
+
+  // Active Total XP & dynamic level progression
+  const displayTotalXP =
+    realtimeXP !== null
+      ? realtimeXP
+      : profileData?.totalXP !== undefined
+      ? profileData.totalXP
+      : 1850;
+
+  const scholarLevel = Math.max(1, Math.floor(displayTotalXP / 300) + 1);
+
+  // Active XP logs
+  const displayXpLogs =
+    realtimeLogs.length > 0
+      ? realtimeLogs
+      : profileData?.xpLogs || [];
 
   const handleSimulateScan = () => {
     setRfidScanned(true);
@@ -98,6 +215,23 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-2 sm:p-6 bg-[#060911]/90 backdrop-blur-2xl overflow-y-auto animate-in fade-in duration-300">
       <div className="relative w-full max-w-7xl h-[95vh] rounded-3xl bg-[#0B0F1A] border border-[#2FD6C8]/40 shadow-2xl flex flex-col overflow-hidden text-white font-sans-ui">
+        {/* Real-time Socket XP Received Toast Notification */}
+        {recentXpAlert && (
+          <div className="absolute top-20 right-6 z-[140] animate-in slide-in-from-top-4 fade-in duration-300 p-4 rounded-2xl bg-[#0E1526]/95 backdrop-blur-xl border-2 border-[#2FD6C8] shadow-[0_0_30px_rgba(47,214,200,0.35)] flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#2FD6C8]/20 flex items-center justify-center text-[#2FD6C8]">
+              <Sparkles className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <div className="text-xs font-mono-tech text-[#2FD6C8] font-bold">
+                {isRtl ? `🎉 +${recentXpAlert.amount} نقطة XP فورية!` : `🎉 +${recentXpAlert.amount} Real-time XP!`}
+              </div>
+              <div className="text-[11px] text-white font-sans-ui max-w-xs truncate">
+                {recentXpAlert.reason}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Top Bar Header */}
         <div className="px-6 py-4 border-b border-[#2FD6C8]/20 bg-[#0E1526] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-4">
@@ -114,8 +248,9 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
                       <span>{isRtl ? 'جاري التحميل...' : 'Syncing...'}</span>
                     </span>
                   ) : profileData ? (
-                    <span className="text-[9px] font-mono-tech px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                      API Online
+                    <span className="flex items-center gap-1 text-[9px] font-mono-tech px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>{socketConnected ? 'Live Socket.io' : 'API Online'}</span>
                     </span>
                   ) : error ? (
                     <span className="text-[9px] font-mono-tech px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30">
@@ -209,7 +344,6 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
           {/* 1. LOADING STATE (Skeleton Loader + Spinner) */}
           {loading && (
             <div className="space-y-8 animate-pulse" aria-busy="true" aria-label="Loading student dashboard">
-              {/* Spinner Indicator Notice */}
               <div className="flex items-center justify-center gap-3 p-3.5 rounded-2xl bg-[#141B2D]/80 border border-[#2FD6C8]/30 text-[#2FD6C8] font-mono-tech text-xs shadow-lg">
                 <Loader2 className="w-4 h-4 animate-spin text-[#2FD6C8]" />
                 <span>
@@ -337,24 +471,30 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
                       </div>
                     </div>
 
-                    {/* Level / XP Pill (Live from GET /student/dashboard) */}
-                    <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl shrink-0">
+                    {/* Level / XP Pill (Dynamically updated via Socket.io) */}
+                    <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl shrink-0 transition-transform duration-300">
                       <div className="w-12 h-12 rounded-xl bg-[#2FD6C8]/10 border border-[#2FD6C8]/40 flex items-center justify-center text-[#2FD6C8]">
-                        <Flame className="w-6 h-6 animate-pulse" />
+                        <Flame className={`w-6 h-6 ${recentXpAlert ? 'animate-bounce text-[#C9A24B]' : 'animate-pulse'}`} />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-[11px] font-mono-tech text-[#F8F6F2]/50">
                             {isRtl ? 'النقاط الأكاديمية (XP)' : 'Total XP'}
                           </span>
-                          {profileData && (
-                            <span className="text-[9px] font-mono-tech px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                              LIVE DB
+                          {socketConnected && (
+                            <span className="text-[9px] font-mono-tech px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                              <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
+                              REALTIME
                             </span>
                           )}
                         </div>
-                        <div className="text-xl font-editorial font-bold text-white">
-                          {`${totalXP.toLocaleString()} XP`}
+                        <div className="text-xl font-editorial font-bold text-white flex items-center gap-2">
+                          <span>{`${displayTotalXP.toLocaleString()} XP`}</span>
+                          {recentXpAlert && (
+                            <span className="text-xs font-mono-tech text-emerald-400 font-bold animate-pulse">
+                              +{recentXpAlert.amount}
+                            </span>
+                          )}
                         </div>
                         <div className="text-[10px] text-[#2FD6C8] font-mono-tech">
                           {isRtl
@@ -402,13 +542,13 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
                       </div>
                     </div>
 
-                    {/* 2. Homework Quests / Real XP Logs */}
+                    {/* 2. Homework Quests / Real-Time XP Logs */}
                     <div className="p-6 rounded-3xl glass-panel border border-white/10 bg-[#0E1526]/80 flex flex-col justify-between">
                       <div>
                         <div className="flex items-center justify-between mb-4">
                           <span className="text-xs font-mono-tech text-[#C9A24B] flex items-center gap-1.5">
                             <Sparkles className="w-3.5 h-3.5" />
-                            {profileData?.xpLogs && profileData.xpLogs.length > 0
+                            {displayXpLogs.length > 0
                               ? (isRtl ? 'سجل النقاط المكتسبة (Live)' : 'Live XP Logs')
                               : (isRtl ? 'المشاريع والواجبات النشطة' : 'Active Quests')}
                           </span>
@@ -421,9 +561,9 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
                         </div>
 
                         <div className="space-y-3">
-                          {/* Render live XP logs if returned by API */}
-                          {profileData?.xpLogs && profileData.xpLogs.length > 0 ? (
-                            profileData.xpLogs.slice(0, 3).map((log) => (
+                          {/* Render live XP logs if returned by API / socket */}
+                          {displayXpLogs.length > 0 ? (
+                            displayXpLogs.slice(0, 3).map((log) => (
                               <div key={log.id} className="p-3 rounded-xl bg-white/5 border border-[#2FD6C8]/20 flex flex-col justify-between">
                                 <div className="flex items-center justify-between mb-1">
                                   <span className="text-xs font-editorial text-white line-clamp-1">{log.reason}</span>
@@ -460,7 +600,11 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
                       </div>
 
                       <div className="pt-4 border-t border-white/10 text-xs text-[#2FD6C8] font-mono-tech">
-                        {profileData ? (isRtl ? '✓ متصل بقاعدة بيانات المدرسة' : '✓ Connected to live database') : (isRtl ? '✓ تسليم الواجبات يتم بنقرة واحدة' : '1-click submission ready')}
+                        {socketConnected
+                          ? (isRtl ? '⚡ تدفق فوري مباشر للبيانات نشط' : '⚡ Live real-time socket active')
+                          : profileData
+                          ? (isRtl ? '✓ متصل بقاعدة بيانات المدرسة' : '✓ Connected to live database')
+                          : (isRtl ? '✓ تسليم الواجبات يتم بنقرة واحدة' : '1-click submission ready')}
                       </div>
                     </div>
 
@@ -560,7 +704,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-editorial text-2xl text-white">
-                        {profileData?.xpLogs && profileData.xpLogs.length > 0
+                        {displayXpLogs.length > 0
                           ? (isRtl ? 'سجل نقاط الخبرة والمهام المكتملة' : 'Verified XP Ledger & Completed Quests')
                           : (isRtl ? 'مغامرات الواجبات والمشاريع المفتوحة' : 'Homework & Research Quests')}
                       </h3>
@@ -568,17 +712,17 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
                         {isRtl ? 'أكمل المهام الموكلة إليك واكسب نقاط الخبرة والشارات' : 'Complete quests to earn XP and level up your scholar ranking.'}
                       </p>
                     </div>
-                    {profileData?.xpLogs && profileData.xpLogs.length > 0 && (
+                    {displayXpLogs.length > 0 && (
                       <div className="text-xs font-mono-tech text-[#2FD6C8] px-3 py-1 rounded-xl bg-white/5 border border-white/10">
-                        {profileData.xpLogs.length} {isRtl ? 'سجلات معتمدة' : 'XP Logs'}
+                        {displayXpLogs.length} {isRtl ? 'سجلات معتمدة' : 'XP Logs'}
                       </div>
                     )}
                   </div>
 
-                  {/* If live XP logs exist from API, display them */}
-                  {profileData?.xpLogs && profileData.xpLogs.length > 0 && (
+                  {/* If live XP logs exist from API or Socket.io, display them */}
+                  {displayXpLogs.length > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                      {profileData.xpLogs.map((log) => (
+                      {displayXpLogs.map((log) => (
                         <div
                           key={log.id}
                           className="p-6 rounded-3xl glass-panel border border-[#2FD6C8]/30 bg-[#0E1526]/90 flex flex-col justify-between"
