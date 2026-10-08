@@ -10,6 +10,8 @@ import {
   Zap,
   Loader2,
   RefreshCw,
+  AlertTriangle,
+  RotateCcw,
 } from 'lucide-react';
 import { mockStudents, mockTimetable, mockHomework, mockBadges } from '../../data/mockData';
 import { useLanguage } from '../../context/LanguageContext';
@@ -50,9 +52,9 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
   const [activeTab, setActiveTab] = useState<'hub' | 'timetable' | 'quests' | 'badges'>('hub');
   const [rfidScanned, setRfidScanned] = useState(false);
 
-  // Live student dashboard state from backend API (GET /student/dashboard)
+  // Live student dashboard state management for GET /student/dashboard
   const [profileData, setProfileData] = useState<StudentProfileResponse | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchStudentDashboard = async () => {
@@ -63,7 +65,12 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
       setProfileData(response.data);
     } catch (err: any) {
       console.warn('Failed to fetch /student/dashboard from API:', err?.response?.data || err.message);
-      setError(err?.response?.data?.error || err.message || 'Unable to connect to live API');
+      setError(
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Unable to connect to live API server'
+      );
     } finally {
       setLoading(false);
     }
@@ -101,13 +108,18 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
               <div>
                 <div className="font-editorial text-base text-white font-medium flex items-center gap-2">
                   <span>{isRtl ? 'فضاء التلميذ · مدرسة الأندلس' : 'Student Hub · El Andalus'}</span>
-                  {profileData ? (
+                  {loading ? (
+                    <span className="flex items-center gap-1 text-[9px] font-mono-tech px-2 py-0.5 rounded-full bg-[#2FD6C8]/10 text-[#2FD6C8] border border-[#2FD6C8]/30">
+                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                      <span>{isRtl ? 'جاري التحميل...' : 'Syncing...'}</span>
+                    </span>
+                  ) : profileData ? (
                     <span className="text-[9px] font-mono-tech px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                       API Online
                     </span>
                   ) : error ? (
-                    <span className="text-[9px] font-mono-tech px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                      Mock Mode
+                    <span className="text-[9px] font-mono-tech px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                      Offline Mode
                     </span>
                   ) : null}
                 </div>
@@ -143,7 +155,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
               onClick={fetchStudentDashboard}
               disabled={loading}
               title={isRtl ? 'تحديث البيانات من الخادم' : 'Refresh from API'}
-              className="p-2 rounded-xl bg-white/5 hover:bg-[#2FD6C8]/20 text-[#2FD6C8] border border-white/10 transition-colors"
+              className="p-2 rounded-xl bg-white/5 hover:bg-[#2FD6C8]/20 text-[#2FD6C8] border border-white/10 transition-colors disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -194,428 +206,512 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ isOpen, onClose })
 
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-8 bg-[#090D18]">
-          {/* TAB 1: Hub Cockpit */}
-          {activeTab === 'hub' && (
-            <div className="space-y-8">
-              {/* Student Hero Header Banner */}
-              <div className="rounded-3xl glass-panel border border-[#2FD6C8]/30 bg-gradient-to-r from-[#141B2D] via-[#0E1526] to-[#141B2D] p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
-                <div className="flex items-center gap-5">
-                  <div className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-[#2FD6C8] shadow-lg shadow-[#2FD6C8]/20 shrink-0">
-                    <img src={currentStudent.avatar} alt={currentStudent.name} className="w-full h-full object-cover" />
-                    <span className="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full bg-[#2FD6C8] border-2 border-[#0B0F1A]" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono-tech px-2.5 py-0.5 rounded bg-[#2FD6C8]/10 text-[#2FD6C8] border border-[#2FD6C8]/30">
-                        {profileData?.user?.role || currentStudent.grade}
-                      </span>
-                      <span className="text-xs font-mono-tech text-[#C9A24B]">
-                        {profileData?.id || currentStudent.id}
-                      </span>
-                      {profileData && (
-                        <span className="text-[10px] font-mono-tech px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                          {profileData.user?.school?.name || 'مدرسة الأندلس'}
-                        </span>
-                      )}
-                    </div>
-                    <h2 className="font-editorial text-2xl sm:text-3xl text-white font-medium">
-                      {profileData?.user?.email
-                        ? (isRtl ? `مرحباً بك يا ${profileData.user.email.split('@')[0]}` : `Welcome back, ${profileData.user.email.split('@')[0]}`)
-                        : (isRtl ? `مرحباً بك يا ${currentStudent.name}` : `Welcome back, ${currentStudent.name}`)}
-                    </h2>
-                    <p className="font-sans-ui text-xs text-[#F8F6F2]/70 mt-1">
-                      {isRtl ? 'الموقع الحالي: ' : 'Supervised in: '}
-                      <span className="text-white font-medium">{currentStudent.supervisedZone}</span>
-                      <span className="text-[#C9A24B] mx-2">·</span>
-                      {isRtl ? 'المؤطر: ' : 'Mentor: '}
-                      <span className="text-[#2FD6C8]">{currentStudent.zoneSupervisor}</span>
-                    </p>
-                  </div>
-                </div>
-
-                {/* Level / XP Pill (Live from GET /student/dashboard) */}
-                <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl shrink-0">
-                  <div className="w-12 h-12 rounded-xl bg-[#2FD6C8]/10 border border-[#2FD6C8]/40 flex items-center justify-center text-[#2FD6C8]">
-                    {loading ? (
-                      <Loader2 className="w-6 h-6 animate-spin text-[#2FD6C8]" />
-                    ) : (
-                      <Flame className="w-6 h-6 animate-pulse" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-mono-tech text-[#F8F6F2]/50">
-                        {isRtl ? 'النقاط الأكاديمية (XP)' : 'Total XP'}
-                      </span>
-                      {profileData && (
-                        <span className="text-[9px] font-mono-tech px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                          LIVE DB
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xl font-editorial font-bold text-white">
-                      {loading ? (
-                        <span className="text-sm font-mono-tech text-[#2FD6C8] animate-pulse">
-                          {isRtl ? 'جاري المزامنة...' : 'Syncing...'}
-                        </span>
-                      ) : (
-                        `${totalXP.toLocaleString()} XP`
-                      )}
-                    </div>
-                    <div className="text-[10px] text-[#2FD6C8] font-mono-tech">
-                      {isRtl
-                        ? `المستوى ${String(scholarLevel).padStart(2, '0')} · مفكر متقدم`
-                        : `Level ${String(scholarLevel).padStart(2, '0')} · Advanced Scholar`}
-                    </div>
-                  </div>
-                </div>
+          {/* 1. LOADING STATE (Skeleton Loader + Spinner) */}
+          {loading && (
+            <div className="space-y-8 animate-pulse" aria-busy="true" aria-label="Loading student dashboard">
+              {/* Spinner Indicator Notice */}
+              <div className="flex items-center justify-center gap-3 p-3.5 rounded-2xl bg-[#141B2D]/80 border border-[#2FD6C8]/30 text-[#2FD6C8] font-mono-tech text-xs shadow-lg">
+                <Loader2 className="w-4 h-4 animate-spin text-[#2FD6C8]" />
+                <span>
+                  {isRtl
+                    ? 'جاري استرداد بيانات التلميذ وسجل النقاط (XP) من خادم الأكاديمية...'
+                    : 'Fetching student profile and XP logs from academic server...'}
+                </span>
               </div>
 
-              {/* Bento Grid: Today's Schedule + Active Quests + Badges Showcase */}
+              {/* Hero Banner Skeleton */}
+              <div className="rounded-3xl border border-[#2FD6C8]/20 bg-[#141B2D]/40 p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-5 w-full md:w-auto">
+                  <div className="w-20 h-20 rounded-2xl bg-white/10 shrink-0" />
+                  <div className="space-y-2.5 w-48 sm:w-64">
+                    <div className="flex gap-2">
+                      <div className="h-4 w-20 rounded bg-white/10" />
+                      <div className="h-4 w-16 rounded bg-white/10" />
+                    </div>
+                    <div className="h-7 w-3/4 rounded-lg bg-white/10" />
+                    <div className="h-3.5 w-1/2 rounded bg-white/10" />
+                  </div>
+                </div>
+                <div className="h-20 w-44 rounded-2xl bg-white/10 shrink-0" />
+              </div>
+
+              {/* Bento Grid Skeletons */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* 1. Schedule Today */}
-                <div className="p-6 rounded-3xl glass-panel border border-white/10 bg-[#0E1526]/80 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-mono-tech text-[#2FD6C8] flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {isRtl ? 'حصص اليوم الدراسي' : "Today's Timetable"}
-                      </span>
-                      <button
-                        onClick={() => setActiveTab('timetable')}
-                        className="text-[11px] font-mono-tech text-[#C9A24B] hover:underline"
-                      >
-                        {isRtl ? 'عرض الجدول كاملاً ←' : 'View Full Schedule →'}
-                      </button>
+                {[1, 2, 3].map((cardIdx) => (
+                  <div
+                    key={cardIdx}
+                    className="p-6 rounded-3xl border border-white/10 bg-[#0E1526]/60 space-y-4"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="h-4 w-28 rounded bg-white/10" />
+                      <div className="h-3 w-16 rounded bg-white/10" />
                     </div>
-
-                    <div className="space-y-3">
-                      {mockTimetable.slice(0, 3).map((slot, i) => (
-                        <div key={i} className="p-3 rounded-xl bg-white/5 border border-white/5">
-                          <div className="flex justify-between text-[11px] font-mono-tech mb-1">
-                            <span className="text-[#C9A24B]">{slot.period}</span>
-                            <span className="text-[#F8F6F2]/50">{slot.room}</span>
-                          </div>
-                          <div className="text-sm font-editorial text-white">{slot.subject}</div>
-                          <div className="text-[11px] text-[#2FD6C8] font-sans-ui mt-0.5">{slot.teacher}</div>
-                        </div>
-                      ))}
+                    <div className="space-y-3 pt-2">
+                      <div className="h-14 rounded-xl bg-white/5" />
+                      <div className="h-14 rounded-xl bg-white/5" />
+                      <div className="h-14 rounded-xl bg-white/5" />
                     </div>
+                    <div className="h-3 w-32 rounded bg-white/5 pt-2" />
                   </div>
-
-                  <div className="pt-4 border-t border-white/10 text-xs text-[#F8F6F2]/50 font-mono-tech">
-                    {isRtl ? 'استراحة الغداء مع الشيف: 12:30 زوالاً' : 'Lunch break at 12:30 PM'}
-                  </div>
-                </div>
-
-                {/* 2. Homework Quests / Real XP Logs */}
-                <div className="p-6 rounded-3xl glass-panel border border-white/10 bg-[#0E1526]/80 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-mono-tech text-[#C9A24B] flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5" />
-                        {profileData?.xpLogs && profileData.xpLogs.length > 0
-                          ? (isRtl ? 'سجل النقاط المكتسبة (Live)' : 'Live XP Logs')
-                          : (isRtl ? 'المشاريع والواجبات النشطة' : 'Active Quests')}
-                      </span>
-                      <button
-                        onClick={() => setActiveTab('quests')}
-                        className="text-[11px] font-mono-tech text-[#2FD6C8] hover:underline"
-                      >
-                        {isRtl ? 'كل المهام ←' : 'All Quests →'}
-                      </button>
-                    </div>
-
-                    <div className="space-y-3">
-                      {/* Render live XP logs if returned by API */}
-                      {profileData?.xpLogs && profileData.xpLogs.length > 0 ? (
-                        profileData.xpLogs.slice(0, 3).map((log) => (
-                          <div key={log.id} className="p-3 rounded-xl bg-white/5 border border-[#2FD6C8]/20 flex flex-col justify-between">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs font-editorial text-white line-clamp-1">{log.reason}</span>
-                              <span className="text-[11px] font-mono-tech text-[#2FD6C8] font-bold">+{log.amount} XP</span>
-                            </div>
-                            <div className="flex items-center justify-between text-[11px] font-mono-tech text-[#F8F6F2]/60">
-                              <span className="text-emerald-400">{isRtl ? 'سجل معتمد' : 'Verified'}</span>
-                              <span className="text-[#C9A24B]">
-                                {new Date(log.awardedAt).toLocaleDateString(isRtl ? 'ar-DZ' : 'en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                })}
-                              </span>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        mockHomework.map((hw) => (
-                          <div key={hw.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col justify-between">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs font-editorial text-white">{hw.title}</span>
-                              <span className="text-[11px] font-mono-tech text-[#2FD6C8]">+{hw.xpReward} XP</span>
-                            </div>
-                            <div className="flex items-center justify-between text-[11px] font-mono-tech text-[#F8F6F2]/60">
-                              <span>{hw.subject}</span>
-                              <span className={hw.status === 'completed' ? 'text-[#2FD6C8]' : 'text-[#C9A24B]'}>
-                                {hw.dueDate}
-                              </span>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-white/10 text-xs text-[#2FD6C8] font-mono-tech">
-                    {profileData ? (isRtl ? '✓ متصل بقاعدة بيانات المدرسة' : '✓ Connected to live database') : (isRtl ? '✓ تسليم الواجبات يتم بنقرة واحدة' : '1-click submission ready')}
-                  </div>
-                </div>
-
-                {/* 3. Badges Showcase */}
-                <div className="p-6 rounded-3xl glass-panel border border-white/10 bg-[#0E1526]/80 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-mono-tech text-[#2FD6C8] flex items-center gap-1.5">
-                        <Award className="w-3.5 h-3.5" />
-                        {isRtl ? 'أوسمة الإنجاز الأخيرة' : 'Earned Badges'}
-                      </span>
-                      <button
-                        onClick={() => setActiveTab('badges')}
-                        className="text-[11px] font-mono-tech text-[#C9A24B] hover:underline"
-                      >
-                        {isRtl ? 'عرض الخزانة ←' : 'View Trophy Case →'}
-                      </button>
-                    </div>
-
-                    <div className="space-y-3">
-                      {mockBadges.map((b) => (
-                        <div key={b.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex items-center gap-3">
-                          <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border"
-                            style={{
-                              backgroundColor: `${b.color}15`,
-                              borderColor: `${b.color}40`,
-                              color: b.color,
-                            }}
-                          >
-                            <Award className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <div className="text-xs font-editorial text-white font-medium">{b.title}</div>
-                            <div className="text-[10px] text-[#F8F6F2]/60 line-clamp-1">{b.description}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-white/10 text-xs text-[#C9A24B] font-mono-tech">
-                    {isRtl ? 'مستمر في حصد الشارات!' : 'Active streak maintained'}
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* TAB 2: Full Weekly Timetable */}
-          {activeTab === 'timetable' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-editorial text-2xl text-white">
-                    {isRtl ? 'جدول التوزيع البيداغوجي الأسبوعي' : 'Weekly Timetable'}
-                  </h3>
-                  <p className="font-sans-ui text-xs text-[#F8F6F2]/70">
-                    {isRtl ? 'موزع وفق وتيرة التركيز البيولوجي للتلاميذ' : 'Circadian synchronized schedule'}
-                  </p>
-                </div>
-                <div className="text-xs font-mono-tech text-[#2FD6C8] px-3 py-1 rounded-xl bg-white/5 border border-white/10">
-                  {currentStudent.grade}
+          {/* 2. ERROR STATE (User-friendly message with Retry Action) */}
+          {!loading && error && (
+            <div className="rounded-3xl border border-rose-500/30 bg-rose-950/20 p-6 sm:p-8 flex flex-col items-center text-center space-y-4 shadow-xl">
+              <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/40 flex items-center justify-center text-rose-400">
+                <AlertTriangle className="w-7 h-7" />
+              </div>
+              <div className="max-w-md space-y-2">
+                <h3 className="font-editorial text-xl sm:text-2xl text-white font-medium">
+                  {isRtl ? 'تعذر جلب بيانات التلميذ من الخادم' : 'Failed to Load Student Profile'}
+                </h3>
+                <p className="font-sans-ui text-xs sm:text-sm text-[#F8F6F2]/70 leading-relaxed">
+                  {isRtl
+                    ? 'حدث خطأ أثناء الاتصال بالخادم الأكاديمي. يرجى التحقق من اتصال الشبكة أو إعادة تسجيل الدخول.'
+                    : 'Unable to communicate with the academy API server. Please verify your connection or re-authenticate your session.'}
+                </p>
+                <div className="p-2.5 rounded-xl bg-black/40 border border-rose-500/20 text-[11px] font-mono-tech text-rose-300 overflow-x-auto">
+                  {error}
                 </div>
               </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-start border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-white/10 text-[#C9A24B] font-mono-tech text-start">
-                      <th className="p-3.5 text-start">{isRtl ? 'اليوم' : 'Day'}</th>
-                      <th className="p-3.5 text-start">{isRtl ? 'التوقيت' : 'Period'}</th>
-                      <th className="p-3.5 text-start">{isRtl ? 'المادة البيداغوجية' : 'Subject'}</th>
-                      <th className="p-3.5 text-start">{isRtl ? 'الأستاذ المؤطر' : 'Instructor'}</th>
-                      <th className="p-3.5 text-start">{isRtl ? 'الفضاء / المختبر' : 'Room / Atelier'}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {mockTimetable.map((slot, i) => (
-                      <tr key={i} className="hover:bg-white/5 transition-colors">
-                        <td className="p-3.5 font-bold text-white">{slot.day}</td>
-                        <td className="p-3.5 font-mono-tech text-[#2FD6C8]">{slot.period}</td>
-                        <td className="p-3.5 font-editorial text-sm text-white">{slot.subject}</td>
-                        <td className="p-3.5 text-[#F8F6F2]/80">{slot.teacher}</td>
-                        <td className="p-3.5 font-mono-tech text-[#C9A24B]">{slot.room}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <button
+                  onClick={fetchStudentDashboard}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#2FD6C8] hover:bg-[#28b8ad] text-[#0B0F1A] font-mono-tech text-xs font-bold transition-all shadow-md shadow-[#2FD6C8]/20"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>{isRtl ? 'إعادة المحاولة الآن' : 'Retry Request'}</span>
+                </button>
+                <button
+                  onClick={() => setError(null)}
+                  className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono-tech text-xs transition-colors"
+                >
+                  <span>{isRtl ? 'المتابعة بالعرض التوضيحي' : 'Dismiss & View Demo'}</span>
+                </button>
               </div>
             </div>
           )}
 
-          {/* TAB 3: Homework Quests & Live XP Logs */}
-          {activeTab === 'quests' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-editorial text-2xl text-white">
-                    {profileData?.xpLogs && profileData.xpLogs.length > 0
-                      ? (isRtl ? 'سجل نقاط الخبرة والمهام المكتملة' : 'Verified XP Ledger & Completed Quests')
-                      : (isRtl ? 'مغامرات الواجبات والمشاريع المفتوحة' : 'Homework & Research Quests')}
-                  </h3>
-                  <p className="font-sans-ui text-xs text-[#F8F6F2]/70">
-                    {isRtl ? 'أكمل المهام الموكلة إليك واكسب نقاط الخبرة والشارات' : 'Complete quests to earn XP and level up your scholar ranking.'}
-                  </p>
-                </div>
-                {profileData?.xpLogs && profileData.xpLogs.length > 0 && (
-                  <div className="text-xs font-mono-tech text-[#2FD6C8] px-3 py-1 rounded-xl bg-white/5 border border-white/10">
-                    {profileData.xpLogs.length} {isRtl ? 'سجلات معتمدة' : 'XP Logs'}
-                  </div>
-                )}
-              </div>
-
-              {/* If live XP logs exist from API, display them */}
-              {profileData?.xpLogs && profileData.xpLogs.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                  {profileData.xpLogs.map((log) => (
-                    <div
-                      key={log.id}
-                      className="p-6 rounded-3xl glass-panel border border-[#2FD6C8]/30 bg-[#0E1526]/90 flex flex-col justify-between"
-                    >
+          {/* 3. NORMAL CONTENT (Visible when not loading) */}
+          {!loading && (
+            <>
+              {/* TAB 1: Hub Cockpit */}
+              {activeTab === 'hub' && (
+                <div className="space-y-8">
+                  {/* Student Hero Header Banner */}
+                  <div className="rounded-3xl glass-panel border border-[#2FD6C8]/30 bg-gradient-to-r from-[#141B2D] via-[#0E1526] to-[#141B2D] p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
+                    <div className="flex items-center gap-5">
+                      <div className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-[#2FD6C8] shadow-lg shadow-[#2FD6C8]/20 shrink-0">
+                        <img src={currentStudent.avatar} alt={currentStudent.name} className="w-full h-full object-cover" />
+                        <span className="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full bg-[#2FD6C8] border-2 border-[#0B0F1A]" />
+                      </div>
                       <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <span className="text-xs font-mono-tech px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
-                            {isRtl ? 'منحة أستاذ' : 'Teacher Award'}
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-mono-tech px-2.5 py-0.5 rounded bg-[#2FD6C8]/10 text-[#2FD6C8] border border-[#2FD6C8]/30">
+                            {profileData?.user?.role || currentStudent.grade}
                           </span>
-                          <span className="text-xs font-mono-tech text-[#C9A24B] font-bold">
-                            +{log.amount} XP
+                          <span className="text-xs font-mono-tech text-[#C9A24B]">
+                            {profileData?.id || currentStudent.id}
                           </span>
+                          {profileData && (
+                            <span className="text-[10px] font-mono-tech px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              {profileData.user?.school?.name || 'مدرسة الأندلس'}
+                            </span>
+                          )}
                         </div>
-
-                        <h4 className="font-editorial text-lg text-white mb-2">
-                          {log.reason}
-                        </h4>
-
-                        <p className="text-xs font-mono-tech text-[#F8F6F2]/60 mb-6">
-                          {isRtl ? 'تاريخ المنح:' : 'Awarded on:'}{' '}
-                          <span className="text-white">
-                            {new Date(log.awardedAt).toLocaleString(isRtl ? 'ar-DZ' : 'en-US')}
-                          </span>
+                        <h2 className="font-editorial text-2xl sm:text-3xl text-white font-medium">
+                          {profileData?.user?.email
+                            ? (isRtl ? `مرحباً بك يا ${profileData.user.email.split('@')[0]}` : `Welcome back, ${profileData.user.email.split('@')[0]}`)
+                            : (isRtl ? `مرحباً بك يا ${currentStudent.name}` : `Welcome back, ${currentStudent.name}`)}
+                        </h2>
+                        <p className="font-sans-ui text-xs text-[#F8F6F2]/70 mt-1">
+                          {isRtl ? 'الموقع الحالي: ' : 'Supervised in: '}
+                          <span className="text-white font-medium">{currentStudent.supervisedZone}</span>
+                          <span className="text-[#C9A24B] mx-2">·</span>
+                          {isRtl ? 'المؤطر: ' : 'Mentor: '}
+                          <span className="text-[#2FD6C8]">{currentStudent.zoneSupervisor}</span>
                         </p>
                       </div>
+                    </div>
 
-                      <div className="w-full py-2.5 rounded-xl text-xs font-mono-tech tracking-wider uppercase bg-[#2FD6C8]/10 text-[#2FD6C8] border border-[#2FD6C8]/30 flex items-center justify-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-[#2FD6C8]" />
-                        <span>{isRtl ? 'معتمد في قاعدة البيانات' : 'Verified in DB'}</span>
+                    {/* Level / XP Pill (Live from GET /student/dashboard) */}
+                    <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl shrink-0">
+                      <div className="w-12 h-12 rounded-xl bg-[#2FD6C8]/10 border border-[#2FD6C8]/40 flex items-center justify-center text-[#2FD6C8]">
+                        <Flame className="w-6 h-6 animate-pulse" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-mono-tech text-[#F8F6F2]/50">
+                            {isRtl ? 'النقاط الأكاديمية (XP)' : 'Total XP'}
+                          </span>
+                          {profileData && (
+                            <span className="text-[9px] font-mono-tech px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              LIVE DB
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xl font-editorial font-bold text-white">
+                          {`${totalXP.toLocaleString()} XP`}
+                        </div>
+                        <div className="text-[10px] text-[#2FD6C8] font-mono-tech">
+                          {isRtl
+                            ? `المستوى ${String(scholarLevel).padStart(2, '0')} · مفكر متقدم`
+                            : `Level ${String(scholarLevel).padStart(2, '0')} · Advanced Scholar`}
+                        </div>
                       </div>
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Bento Grid: Today's Schedule + Active Quests + Badges Showcase */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* 1. Schedule Today */}
+                    <div className="p-6 rounded-3xl glass-panel border border-white/10 bg-[#0E1526]/80 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs font-mono-tech text-[#2FD6C8] flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {isRtl ? 'حصص اليوم الدراسي' : "Today's Timetable"}
+                          </span>
+                          <button
+                            onClick={() => setActiveTab('timetable')}
+                            className="text-[11px] font-mono-tech text-[#C9A24B] hover:underline"
+                          >
+                            {isRtl ? 'عرض الجدول كاملاً ←' : 'View Full Schedule →'}
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          {mockTimetable.slice(0, 3).map((slot, i) => (
+                            <div key={i} className="p-3 rounded-xl bg-white/5 border border-white/5">
+                              <div className="flex justify-between text-[11px] font-mono-tech mb-1">
+                                <span className="text-[#C9A24B]">{slot.period}</span>
+                                <span className="text-[#F8F6F2]/50">{slot.room}</span>
+                              </div>
+                              <div className="text-sm font-editorial text-white">{slot.subject}</div>
+                              <div className="text-[11px] text-[#2FD6C8] font-sans-ui mt-0.5">{slot.teacher}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-white/10 text-xs text-[#F8F6F2]/50 font-mono-tech">
+                        {isRtl ? 'استراحة الغداء مع الشيف: 12:30 زوالاً' : 'Lunch break at 12:30 PM'}
+                      </div>
+                    </div>
+
+                    {/* 2. Homework Quests / Real XP Logs */}
+                    <div className="p-6 rounded-3xl glass-panel border border-white/10 bg-[#0E1526]/80 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs font-mono-tech text-[#C9A24B] flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            {profileData?.xpLogs && profileData.xpLogs.length > 0
+                              ? (isRtl ? 'سجل النقاط المكتسبة (Live)' : 'Live XP Logs')
+                              : (isRtl ? 'المشاريع والواجبات النشطة' : 'Active Quests')}
+                          </span>
+                          <button
+                            onClick={() => setActiveTab('quests')}
+                            className="text-[11px] font-mono-tech text-[#2FD6C8] hover:underline"
+                          >
+                            {isRtl ? 'كل المهام ←' : 'All Quests →'}
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          {/* Render live XP logs if returned by API */}
+                          {profileData?.xpLogs && profileData.xpLogs.length > 0 ? (
+                            profileData.xpLogs.slice(0, 3).map((log) => (
+                              <div key={log.id} className="p-3 rounded-xl bg-white/5 border border-[#2FD6C8]/20 flex flex-col justify-between">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-xs font-editorial text-white line-clamp-1">{log.reason}</span>
+                                  <span className="text-[11px] font-mono-tech text-[#2FD6C8] font-bold">+{log.amount} XP</span>
+                                </div>
+                                <div className="flex items-center justify-between text-[11px] font-mono-tech text-[#F8F6F2]/60">
+                                  <span className="text-emerald-400">{isRtl ? 'سجل معتمد' : 'Verified'}</span>
+                                  <span className="text-[#C9A24B]">
+                                    {new Date(log.awardedAt).toLocaleDateString(isRtl ? 'ar-DZ' : 'en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                    })}
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            mockHomework.map((hw) => (
+                              <div key={hw.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col justify-between">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-xs font-editorial text-white">{hw.title}</span>
+                                  <span className="text-[11px] font-mono-tech text-[#2FD6C8]">+{hw.xpReward} XP</span>
+                                </div>
+                                <div className="flex items-center justify-between text-[11px] font-mono-tech text-[#F8F6F2]/60">
+                                  <span>{hw.subject}</span>
+                                  <span className={hw.status === 'completed' ? 'text-[#2FD6C8]' : 'text-[#C9A24B]'}>
+                                    {hw.dueDate}
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-white/10 text-xs text-[#2FD6C8] font-mono-tech">
+                        {profileData ? (isRtl ? '✓ متصل بقاعدة بيانات المدرسة' : '✓ Connected to live database') : (isRtl ? '✓ تسليم الواجبات يتم بنقرة واحدة' : '1-click submission ready')}
+                      </div>
+                    </div>
+
+                    {/* 3. Badges Showcase */}
+                    <div className="p-6 rounded-3xl glass-panel border border-white/10 bg-[#0E1526]/80 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs font-mono-tech text-[#2FD6C8] flex items-center gap-1.5">
+                            <Award className="w-3.5 h-3.5" />
+                            {isRtl ? 'أوسمة الإنجاز الأخيرة' : 'Earned Badges'}
+                          </span>
+                          <button
+                            onClick={() => setActiveTab('badges')}
+                            className="text-[11px] font-mono-tech text-[#C9A24B] hover:underline"
+                          >
+                            {isRtl ? 'عرض الخزانة ←' : 'View Trophy Case →'}
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          {mockBadges.map((b) => (
+                            <div key={b.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex items-center gap-3">
+                              <div
+                                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border"
+                                style={{
+                                  backgroundColor: `${b.color}15`,
+                                  borderColor: `${b.color}40`,
+                                  color: b.color,
+                                }}
+                              >
+                                <Award className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <div className="text-xs font-editorial text-white font-medium">{b.title}</div>
+                                <div className="text-[10px] text-[#F8F6F2]/60 line-clamp-1">{b.description}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-white/10 text-xs text-[#C9A24B] font-mono-tech">
+                        {isRtl ? 'مستمر في حصد الشارات!' : 'Active streak maintained'}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {mockHomework.map((hw) => (
-                  <div
-                    key={hw.id}
-                    className="p-6 rounded-3xl glass-panel border border-white/10 bg-[#0E1526]/90 flex flex-col justify-between"
-                  >
+              {/* TAB 2: Full Weekly Timetable */}
+              {activeTab === 'timetable' && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="text-xs font-mono-tech px-2.5 py-0.5 rounded bg-[#2FD6C8]/10 text-[#2FD6C8] border border-[#2FD6C8]/30">
-                          {hw.subject}
-                        </span>
-                        <span className="text-xs font-mono-tech text-[#C9A24B] font-bold">
-                          +{hw.xpReward} XP
-                        </span>
-                      </div>
-
-                      <h4 className="font-editorial text-lg text-white mb-2">
-                        {hw.title}
-                      </h4>
-
-                      <p className="text-xs font-mono-tech text-[#F8F6F2]/60 mb-6">
-                        {isRtl ? 'الموعد الأخير للتسليم:' : 'Deadline:'} <span className="text-white">{hw.dueDate}</span>
+                      <h3 className="font-editorial text-2xl text-white">
+                        {isRtl ? 'جدول التوزيع البيداغوجي الأسبوعي' : 'Weekly Timetable'}
+                      </h3>
+                      <p className="font-sans-ui text-xs text-[#F8F6F2]/70">
+                        {isRtl ? 'موزع وفق وتيرة التركيز البيولوجي للتلاميذ' : 'Circadian synchronized schedule'}
                       </p>
                     </div>
-
-                    <button
-                      className={`w-full py-2.5 rounded-xl text-xs font-mono-tech tracking-wider uppercase transition-all flex items-center justify-center gap-2 ${
-                        hw.status === 'completed'
-                          ? 'bg-[#2FD6C8]/20 text-[#2FD6C8] border border-[#2FD6C8]/40'
-                          : 'bg-[#C9A24B] text-[#0B0F1A] font-bold'
-                      }`}
-                    >
-                      {hw.status === 'completed' ? (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 text-[#2FD6C8]" />
-                          <span>{isRtl ? 'تم الإنجاز والتقييم' : 'Completed'}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4" />
-                          <span>{isRtl ? 'تسليم الواجب الآن' : 'Submit Quest Work'}</span>
-                        </>
-                      )}
-                    </button>
+                    <div className="text-xs font-mono-tech text-[#2FD6C8] px-3 py-1 rounded-xl bg-white/5 border border-white/10">
+                      {currentStudent.grade}
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* TAB 4: Badges of Honor */}
-          {activeTab === 'badges' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              <div>
-                <h3 className="font-editorial text-2xl text-white">
-                  {isRtl ? 'خزانة الأوسمة والشارات التكريمية' : 'Trophy Case & Badges'}
-                </h3>
-                <p className="font-sans-ui text-xs text-[#F8F6F2]/70">
-                  {isRtl ? 'أوسمة تُمنح للتلاميذ المتميزين في الفصاحة، البحث، التعاون، والأخلاق' : 'Official badges awarded for outstanding ethical and academic milestones.'}
-                </p>
-              </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-start border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-white/10 text-[#C9A24B] font-mono-tech text-start">
+                          <th className="p-3.5 text-start">{isRtl ? 'اليوم' : 'Day'}</th>
+                          <th className="p-3.5 text-start">{isRtl ? 'التوقيت' : 'Period'}</th>
+                          <th className="p-3.5 text-start">{isRtl ? 'المادة البيداغوجية' : 'Subject'}</th>
+                          <th className="p-3.5 text-start">{isRtl ? 'الأستاذ المؤطر' : 'Instructor'}</th>
+                          <th className="p-3.5 text-start">{isRtl ? 'الفضاء / المختبر' : 'Room / Atelier'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {mockTimetable.map((slot, i) => (
+                          <tr key={i} className="hover:bg-white/5 transition-colors">
+                            <td className="p-3.5 font-bold text-white">{slot.day}</td>
+                            <td className="p-3.5 font-mono-tech text-[#2FD6C8]">{slot.period}</td>
+                            <td className="p-3.5 font-editorial text-sm text-white">{slot.subject}</td>
+                            <td className="p-3.5 text-[#F8F6F2]/80">{slot.teacher}</td>
+                            <td className="p-3.5 font-mono-tech text-[#C9A24B]">{slot.room}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {mockBadges.map((badge) => (
-                  <div
-                    key={badge.id}
-                    className="p-8 rounded-3xl glass-panel border border-white/10 bg-[#0E1526]/90 text-center flex flex-col items-center justify-between"
-                  >
+              {/* TAB 3: Homework Quests & Live XP Logs */}
+              {activeTab === 'quests' && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  <div className="flex items-center justify-between">
                     <div>
+                      <h3 className="font-editorial text-2xl text-white">
+                        {profileData?.xpLogs && profileData.xpLogs.length > 0
+                          ? (isRtl ? 'سجل نقاط الخبرة والمهام المكتملة' : 'Verified XP Ledger & Completed Quests')
+                          : (isRtl ? 'مغامرات الواجبات والمشاريع المفتوحة' : 'Homework & Research Quests')}
+                      </h3>
+                      <p className="font-sans-ui text-xs text-[#F8F6F2]/70">
+                        {isRtl ? 'أكمل المهام الموكلة إليك واكسب نقاط الخبرة والشارات' : 'Complete quests to earn XP and level up your scholar ranking.'}
+                      </p>
+                    </div>
+                    {profileData?.xpLogs && profileData.xpLogs.length > 0 && (
+                      <div className="text-xs font-mono-tech text-[#2FD6C8] px-3 py-1 rounded-xl bg-white/5 border border-white/10">
+                        {profileData.xpLogs.length} {isRtl ? 'سجلات معتمدة' : 'XP Logs'}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* If live XP logs exist from API, display them */}
+                  {profileData?.xpLogs && profileData.xpLogs.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                      {profileData.xpLogs.map((log) => (
+                        <div
+                          key={log.id}
+                          className="p-6 rounded-3xl glass-panel border border-[#2FD6C8]/30 bg-[#0E1526]/90 flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-4">
+                              <span className="text-xs font-mono-tech px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                                {isRtl ? 'منحة أستاذ' : 'Teacher Award'}
+                              </span>
+                              <span className="text-xs font-mono-tech text-[#C9A24B] font-bold">
+                                +{log.amount} XP
+                              </span>
+                            </div>
+
+                            <h4 className="font-editorial text-lg text-white mb-2">
+                              {log.reason}
+                            </h4>
+
+                            <p className="text-xs font-mono-tech text-[#F8F6F2]/60 mb-6">
+                              {isRtl ? 'تاريخ المنح:' : 'Awarded on:'}{' '}
+                              <span className="text-white">
+                                {new Date(log.awardedAt).toLocaleString(isRtl ? 'ar-DZ' : 'en-US')}
+                              </span>
+                            </p>
+                          </div>
+
+                          <div className="w-full py-2.5 rounded-xl text-xs font-mono-tech tracking-wider uppercase bg-[#2FD6C8]/10 text-[#2FD6C8] border border-[#2FD6C8]/30 flex items-center justify-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-[#2FD6C8]" />
+                            <span>{isRtl ? 'معتمد في قاعدة البيانات' : 'Verified in DB'}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {mockHomework.map((hw) => (
                       <div
-                        className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border shadow-lg"
-                        style={{
-                          backgroundColor: `${badge.color}15`,
-                          borderColor: `${badge.color}50`,
-                          color: badge.color,
-                        }}
+                        key={hw.id}
+                        className="p-6 rounded-3xl glass-panel border border-white/10 bg-[#0E1526]/90 flex flex-col justify-between"
                       >
-                        <Award className="w-8 h-8" />
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <span className="text-xs font-mono-tech px-2.5 py-0.5 rounded bg-[#2FD6C8]/10 text-[#2FD6C8] border border-[#2FD6C8]/30">
+                              {hw.subject}
+                            </span>
+                            <span className="text-xs font-mono-tech text-[#C9A24B] font-bold">
+                              +{hw.xpReward} XP
+                            </span>
+                          </div>
+
+                          <h4 className="font-editorial text-lg text-white mb-2">
+                            {hw.title}
+                          </h4>
+
+                          <p className="text-xs font-mono-tech text-[#F8F6F2]/60 mb-6">
+                            {isRtl ? 'الموعد الأخير للتسليم:' : 'Deadline:'} <span className="text-white">{hw.dueDate}</span>
+                          </p>
+                        </div>
+
+                        <button
+                          className={`w-full py-2.5 rounded-xl text-xs font-mono-tech tracking-wider uppercase transition-all flex items-center justify-center gap-2 ${
+                            hw.status === 'completed'
+                              ? 'bg-[#2FD6C8]/20 text-[#2FD6C8] border border-[#2FD6C8]/40'
+                              : 'bg-[#C9A24B] text-[#0B0F1A] font-bold'
+                          }`}
+                        >
+                          {hw.status === 'completed' ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-[#2FD6C8]" />
+                              <span>{isRtl ? 'تم الإنجاز والتقييم' : 'Completed'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4" />
+                              <span>{isRtl ? 'تسليم الواجب الآن' : 'Submit Quest Work'}</span>
+                            </>
+                          )}
+                        </button>
                       </div>
-
-                      <h4 className="font-editorial text-xl text-white mb-2">
-                        {badge.title}
-                      </h4>
-
-                      <p className="font-sans-ui text-xs text-[#F8F6F2]/75 leading-relaxed mb-6">
-                        {badge.description}
-                      </p>
-                    </div>
-
-                    <div className="text-[11px] font-mono-tech text-[#C9A24B]">
-                      {isRtl ? 'تاريخ التتويج:' : 'Awarded on:'} {badge.dateEarned}
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              )}
+
+              {/* TAB 4: Badges of Honor */}
+              {activeTab === 'badges' && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  <div>
+                    <h3 className="font-editorial text-2xl text-white">
+                      {isRtl ? 'خزانة الأوسمة والشارات التكريمية' : 'Trophy Case & Badges'}
+                    </h3>
+                    <p className="font-sans-ui text-xs text-[#F8F6F2]/70">
+                      {isRtl ? 'أوسمة تُمنح للتلاميذ المتميزين في الفصاحة، البحث، التعاون، والأخلاق' : 'Official badges awarded for outstanding ethical and academic milestones.'}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {mockBadges.map((badge) => (
+                      <div
+                        key={badge.id}
+                        className="p-8 rounded-3xl glass-panel border border-white/10 bg-[#0E1526]/90 text-center flex flex-col items-center justify-between"
+                      >
+                        <div>
+                          <div
+                            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border shadow-lg"
+                            style={{
+                              backgroundColor: `${badge.color}15`,
+                              borderColor: `${badge.color}50`,
+                              color: badge.color,
+                            }}
+                          >
+                            <Award className="w-8 h-8" />
+                          </div>
+
+                          <h4 className="font-editorial text-xl text-white mb-2">
+                            {badge.title}
+                          </h4>
+
+                          <p className="font-sans-ui text-xs text-[#F8F6F2]/75 leading-relaxed mb-6">
+                            {badge.description}
+                          </p>
+                        </div>
+
+                        <div className="text-[11px] font-mono-tech text-[#C9A24B]">
+                          {isRtl ? 'تاريخ التتويج:' : 'Awarded on:'} {badge.dateEarned}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

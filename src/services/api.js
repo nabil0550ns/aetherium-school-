@@ -27,4 +27,25 @@ api.interceptors.request.use(
   }
 );
 
+// Response interceptor: automatically clear invalid token and redirect to /login on 401 Unauthorized
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response && error.response.status === 401) {
+      // Clear token from localStorage
+      localStorage.removeItem('token');
+      localStorage.removeItem('jwt');
+      localStorage.removeItem('jwt_token');
+      localStorage.removeItem('authToken');
+
+      // Redirect user to /login
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
 export default api;
